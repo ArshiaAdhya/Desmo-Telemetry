@@ -1,0 +1,14 @@
+.env
+.DS_Store
+.vscode/
+
+build/
+bin/
+*.o
+*.exe
+fleet_sim
+
+mosquitto_data/
+mosquitto_log/
+influxdb_data/
+grafana_data/
