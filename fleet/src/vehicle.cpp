@@ -93,7 +93,7 @@ void Vehicle::Tick(double dt){
 
     // Thermodynamics
     double heat_in = (m_rpm/3000.0)*15.0*dt;
-    double heat_out = (m_rpm-25.0)*0.2*dt;
+    double heat_out = (m_temp-25.0)*0.2*dt;
     m_temp += (heat_in - heat_out);
     m_temp = clamp(m_temp,25.0,150.0);
 
