@@ -1,12 +1,24 @@
 .env
 .DS_Store
 .vscode/
+.idea/
+*.log
 
 build/
 bin/
 *.o
 *.exe
+*.obj
+*.dll
 fleet_sim
+packet_test
+
+mosquitto_certs/
+*.key
+*.crt
+*.csr
+*.pem
+*.srl
 
 mosquitto_data/
 mosquitto_log/

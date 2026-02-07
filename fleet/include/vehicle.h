@@ -11,7 +11,16 @@ public:
     void Tick(double dt_seconds);
 
     // Serializes internal state into Packet struct
-    void Snapshot(Packet& packet);
+    void Snapshot(Packet& packet, double dt);
+
+    // Calculate RPM on shifting up/down
+    void CalculateRPM();
+
+    // Calculate torque factor based on where we are in the power band
+    double GetTorqueCurve(double rpm);
+
+    // Set the throttle (multiplier for max_force)
+    void SetThrottle(double throttle);
 
 private:
     uint16_t m_id;
@@ -25,8 +34,10 @@ private:
 
     int m_gear;
     double m_target_speed;
+    double m_throttle;
+    double m_battery_level;
 
     // Random noise generator for added realism
     std::mt19937 m_rng;
     std::normal_distribution<double> m_noise;
-}
+};

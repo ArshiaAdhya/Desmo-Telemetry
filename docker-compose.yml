@@ -4,11 +4,11 @@ services:
     container_name: mosquitto
     ports:
       - "1883:1883"
-      - "9001:9001"
+      - "8883:8883"
     volumes:
-      - mosquitto_data:/mosquitto/data
-      - mosquitto_log:/mosquitto/log
-    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto_certs:/mosquitto/certs
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
   
   influxdb:
     image: influxdb:2
