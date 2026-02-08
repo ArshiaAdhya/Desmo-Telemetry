@@ -37,15 +37,27 @@ void signal_handler(int){
     g_running = false;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     signal(SIGINT, signal_handler);
-    std::cout<<"----------------------DESMO FLEET--------------------\n";
+    uint16_t vehicle_id = 101;
+    if(argc>1){
+        try{
+            vehicle_id = static_cast<uint16_t>(std::stoi(argv[1]));
+        } catch(...){
+            std::cerr<<"INVALID ID PROVIDED. Defaulting to 101\n";
+        }
+    }
+    std::cout<<"----------------------DESMO FLEET: Vehicle: " << vehicle_id<< "--------------------\n";
     MqttForge uplink;
-    Vehicle car(101);
+    Vehicle car(vehicle_id);
 
     Packet packet{};
     packet.magic = 0xD350; // Desmo System ;)
     packet.vehicle_id = 101;
+
+    std::string client_id = "sim_client_" + std::to_string(vehicle_id);
+    std::string topic = "fleet/"+std::to_string(vehicle_id)+"/telemetry";
+    
     std::vector<uint8_t> buffer;
     buffer.reserve(32);
     uint32_t seq = 0;
@@ -58,7 +70,7 @@ int main() {
     int state_timer = 0;
 
     while(g_running){
-        if(!uplink.Connect("127.0.0.1", 1883, "vehicle_101")){
+        if(!uplink.Connect("127.0.0.1", 1883, client_id)){
             std::cout << "Connect Failed. Retrying";
             Sleep(2000);
             continue;
@@ -127,7 +139,7 @@ int main() {
 
             // Network Transmission
             // Publish to this with QOS1
-            if(!uplink.Publish("fleet/101/telemetry", buffer, 1)){
+            if(!uplink.Publish(topic, buffer, 1)){
                 std::cerr << "LINK LOST (NO ACK). Reconnecting..\n";
                 break;
             }
