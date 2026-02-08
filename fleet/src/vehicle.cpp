@@ -39,6 +39,9 @@ void Vehicle::CalculateRPM(){
 
     // Engine Idle Floor
     if (m_rpm<800.0) m_rpm = 800.0;
+
+    // Safety Redline Cap
+    if(m_rpm>16000.0) m_rpm = 16000.0;
 }
 
 void Vehicle::SetThrottle(double throttle){
