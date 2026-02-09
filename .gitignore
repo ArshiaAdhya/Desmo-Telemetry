@@ -4,6 +4,7 @@
 .idea/
 *.log
 
+backend/.env
 build/
 bin/
 *.o

@@ -11,7 +11,7 @@ services:
     command: ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
   
   influxdb:
-    image: influxdb:2
+    image: influxdb:2.7
     container_name: influxdb
     restart: always
     ports:
