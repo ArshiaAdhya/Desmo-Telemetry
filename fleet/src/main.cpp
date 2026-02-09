@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
     uint32_t seq = 0;
 
     std::random_device rd;
-    std::mt19937 rng(rd());
+    std::mt19937 rng(rd() + vehicle_id);
     std::uniform_int_distribution<int> dice(0,99);
 
     DriverState current_state = CITY_CRUISE;
@@ -89,10 +89,10 @@ int main(int argc, char* argv[]) {
                 else if(roll<22){
                     current_state = HIGHWAY_SPRINT;
                 } 
-                else if(roll<62){
+                else if(roll<70){
                     current_state = CITY_CRUISE;
                 }
-                else if(roll>90){
+                else {
                     current_state = IDLE;
                 }
             }
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
                     throttle_input = 1.0;
                     break;
                 case CITY_CRUISE:
-                    throttle_input = (std::sin(seq*0.05)+1.0) / 2.0 * 0.6;
+                    throttle_input = (std::sin((seq+vehicle_id)*0.05)+1.0) / 2.0 * 0.6;
                     break;
                 case PANIC_STOP:
                     throttle_input = -1.0;
