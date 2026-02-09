@@ -136,7 +136,7 @@ func processJob(logger *slog.Logger, job Job, writeAPI api.WriteAPI) {
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		slog.Warn("No .env found. Using system environment variables")
+		slog.Warn("No .env found. Using system environment variables instead")
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
