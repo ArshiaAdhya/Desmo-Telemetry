@@ -3,6 +3,12 @@
 #include <random>
 #include "packet.h"
 
+enum VehicleCommand : uint8_t {
+    CMD_KILL = 0x01,
+    CMD_LIMP = 0x02,
+    CMD_NORMAL = 0x03
+};
+
 class Vehicle{
 public:
     Vehicle(uint16_t id);
@@ -22,6 +28,10 @@ public:
     // Set the throttle (multiplier for max_force)
     void SetThrottle(double throttle);
 
+    // Called whenever a network packet arrives
+    void OnCommand(uint8_t opcode);
+
+
 private:
     uint16_t m_id;
 
@@ -36,6 +46,8 @@ private:
     double m_target_speed;
     double m_throttle;
     double m_battery_level;
+    bool m_remote_kill;
+    bool m_limp_mode;
 
     // Random noise generator for added realism
     std::mt19937 m_rng;

@@ -1,6 +1,7 @@
 #include "../include/vehicle.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 template <typename T>
 inline T clamp(T v, T lo, T hi)
@@ -8,7 +9,12 @@ inline T clamp(T v, T lo, T hi)
     return (v < lo) ? lo : (v > hi) ? hi : v;
 }
 
-Vehicle::Vehicle(uint16_t id) : m_id(id), m_noise(0.0,2.5), m_battery_level(100.0){
+Vehicle::Vehicle(uint16_t id) 
+        : m_id(id), 
+        m_noise(0.0,2.5), 
+        m_battery_level(100.0),
+        m_remote_kill(false),
+        m_limp_mode(false) {
     m_rng.seed(id);
     m_speed = 0.0;
     m_rpm = 800;
@@ -31,6 +37,10 @@ double Vehicle::GetTorqueCurve(double rpm){
 }
 
 void Vehicle::CalculateRPM(){
+    if(m_remote_kill){
+        m_rpm = 0.0;
+        return;
+    }
     double gear_ratio = 4.8 - (m_gear*0.65);
     if(gear_ratio<0.8) gear_ratio = 0.8;
 
@@ -49,6 +59,27 @@ void Vehicle::SetThrottle(double throttle){
     m_throttle = throttle;
 }
 
+void Vehicle::OnCommand(uint8_t opcode){
+    switch (opcode) {
+        case CMD_KILL:
+            m_remote_kill = true;
+            std::cout<<"[CMD] REMOTE KILL SWITCH ACTIVE!!";
+            break;
+        case CMD_LIMP:
+            m_limp_mode = true;
+            std::cout<<"[CMD] LIMP MODE ACTIVE!!";
+            break;
+        case CMD_NORMAL:
+            m_remote_kill = false;
+            m_limp_mode = false;
+            std::cout<<"[CMD] REGULAR MODE. \n";
+            break;
+        default:
+            std::cout<<"[CMD] Unknown OpCode: " << (int)opcode << "\n";
+            break;
+    }
+}
+
 void Vehicle::Tick(double dt){
     // 1. CONTINUOUS THROTTLE (Proportional Control)
     // Error = target - current
@@ -56,6 +87,15 @@ void Vehicle::Tick(double dt){
 
     double internal_demand = clamp(speed_error*0.1, 0.0, 1.0);
     double final_throttle = (m_throttle>0) ? m_throttle : internal_demand;
+
+    // Intervention logic
+    if(m_remote_kill){
+        final_throttle = -1.0;
+        m_rpm = 0;
+    } else if(m_limp_mode){
+        if(m_speed>40.0) final_throttle = -0.5;
+        else if(final_throttle>0.3) final_throttle = 0.3;
+    }
 
     // 2. Engine force
     double max_torque = 100.0;
@@ -125,6 +165,8 @@ void Vehicle::Snapshot(Packet &p, double dt){
     if(p.temp>115) p.flags |= Flags::OVERHEAT;
     if(p.battery_level<20) p.flags |= Flags::LOW_BATTERY;
     if(m_acceleration<-5.0) p.flags |= Flags::ABS_ACTIVE;
+
+    if(m_remote_kill) p.flags |= Flags::REMOTE_KILL;
 
     p.cpu_load = 10 + (rand()%30);
 

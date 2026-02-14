@@ -53,10 +53,24 @@ int main(int argc, char* argv[]) {
 
     Packet packet{};
     packet.magic = 0xD350; // Desmo System ;)
-    packet.vehicle_id = 101;
+    packet.vehicle_id = vehicle_id;
 
     std::string client_id = "sim_client_" + std::to_string(vehicle_id);
     std::string topic = "fleet/"+std::to_string(vehicle_id)+"/telemetry";
+    std::string topic_cmd = "fleet/" + std::to_string(vehicle_id)+"/cmd";
+
+    uplink.SetCallBack([&](std::string topic, const uint8_t* payload, int len){
+        if(topic==topic_cmd && len>0){
+            uint8_t opcode = payload[0];
+
+            if(opcode=='1') opcode = 0x01;
+            if(opcode=='2') opcode = 0x02;
+            if(opcode=='3') opcode = 0x03;
+
+            std::cout<<"\n[RX] COMMAND RECEIVED: "<<(int) opcode << "\n";
+            car.OnCommand(opcode);
+        }
+    });
     
     std::vector<uint8_t> buffer;
     buffer.reserve(32);
@@ -75,7 +89,10 @@ int main(int argc, char* argv[]) {
             Sleep(2000);
             continue;
         }
-        std::cout<<"Link Established. Telemetry System Active.\n";
+
+        if(uplink.Subscribe(topic_cmd)) std::cout<<"Link Established, Listening on: "<<topic_cmd<<"\n";
+        else std::cout<<"Link Established. Telemetry System Active. Subscription Failed.\n";
+        
         while(g_running){
 
             // Driver Logic
@@ -139,8 +156,8 @@ int main(int argc, char* argv[]) {
 
             // Network Transmission
             // Publish to this with QOS1
-            if(!uplink.Publish(topic, buffer, 1)){
-                std::cerr << "LINK LOST (NO ACK). Reconnecting..\n";
+            if(!uplink.Publish(topic, buffer, 0)){
+                std::cerr << "LINK LOST. Reconnecting..\n";
                 break;
             }
 

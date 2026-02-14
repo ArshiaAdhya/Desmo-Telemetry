@@ -15,6 +15,7 @@ namespace Flags {
     constexpr uint8_t LOW_BATTERY  = 1 << 2; 
     constexpr uint8_t ABS_ACTIVE   = 1 << 3; 
     constexpr uint8_t TCS_ACTIVE   = 1 << 4; 
+    constexpr uint8_t REMOTE_KILL  = 1 << 5;
 }
 
 #pragma pack(push, 1)

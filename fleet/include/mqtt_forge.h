@@ -6,6 +6,7 @@
 #include <string>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 
 #pragma comment (lib, "Ws2_32.lib")
 
@@ -14,7 +15,10 @@ const uint8_t PACKET_CONNECT = 0x10;
 const uint8_t PACKET_CONNACK = 0x20;
 const uint8_t PACKET_PUBLISH = 0x30;
 const uint8_t PACKET_PUBACK = 0x40;
+const uint8_t PACKET_SUBSCRIBE = 0x82;
+const uint8_t PACKET_SUBACK = 0x90;
 const uint8_t PACKET_PINGREQ = 0xC0;
+const uint8_t PACKET_PINGRESP = 0xD0;
 const uint8_t PACKET_DISCONNECT = 0xE0;
 
 
@@ -24,6 +28,9 @@ class MqttForge {
     uint16_t packet_id_counter = 1;
     std::chrono::steady_clock::time_point last_sent_time;
 
+    using MsgCallback = std::function<void(std::string, const uint8_t*, int)>;
+    MsgCallback m_on_msg;
+
 public:
     MqttForge() : sock(INVALID_SOCKET){
         WSADATA wsaData;
@@ -32,6 +39,10 @@ public:
     ~MqttForge() {
         if(is_connected) Disconnect();
         WSACleanup();
+    }
+
+    void SetCallBack(MsgCallback cb){
+        m_on_msg = cb;
     }
 
     bool SendAll(const std::vector<uint8_t> &data){
@@ -54,6 +65,21 @@ public:
             total_read += n;
         }
         return true;
+    }
+
+    int DecodeLength(){
+        int multiplier = 1;
+        int value = 0;
+        uint8_t encodedByte;
+        while(true){
+            if(!RecvExact(&encodedByte, 1)) return -1;
+            value += (encodedByte & 127) * multiplier;
+            multiplier *= 128;
+            if(multiplier>128*128*128) return -1;
+            if((encodedByte & 128) == 0) break;
+        }
+
+        return value;
     }
 
     void EncodeLength(std::vector<uint8_t> &buffer, int length){
@@ -112,6 +138,43 @@ public:
         return false;
     }
 
+    bool Subscribe(std::string topic){
+        if(!is_connected) return false;
+
+        // Packet ID
+        uint16_t pid = packet_id_counter++;
+        std::vector<uint8_t> payload;
+        EncodeString(payload, topic);
+        payload.push_back(0x01); // QoS 1
+
+        // Header
+        std::vector<uint8_t> packet;
+        packet.push_back(PACKET_SUBSCRIBE);
+
+        EncodeLength(packet, 2+payload.size());
+
+        packet.push_back(pid>>8);
+        packet.push_back(pid & 0xFF);
+        packet.insert(packet.end(), payload.begin(), payload.end());
+
+        if(!SendAll(packet)) return false;
+
+        uint8_t header;
+        if(!RecvExact(&header, 1)) return false;
+        int len = DecodeLength();
+        if(len<0) return false;
+
+        // Read the remaining bytes to clear the buffer
+        std::vector<uint8_t> body(len);
+        if(!RecvExact(body.data(), len)) return false;
+
+        if(header != PACKET_SUBACK){
+            std::cout<<"[MQTT] Error: Expected SUBACK, got: " << (int) header << "\n" ;
+            return false;
+        }
+        return true;
+    }
+
     bool Publish(std::string topic, const std::vector<uint8_t> &payload, int qos = 1){
         if(!is_connected) return false;
         std::vector<uint8_t> var_header;
@@ -153,6 +216,52 @@ public:
 
     void Tick() {
         if(!is_connected) return;
+
+        // 1. Read
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(sock, &readfds);
+        struct timeval tv = {0,0};
+
+        int activity = select(0, &readfds, NULL, NULL, &tv);
+
+        if(activity>0 && FD_ISSET(sock, &readfds)){
+            uint8_t header;
+            if(RecvExact(&header, 1)){
+                int remaining_len = DecodeLength();
+                if(remaining_len < 0) {
+                    Disconnect();
+                    return;
+                }
+                // Emptying the socket for the next message
+                std::vector<uint8_t> buffer;
+                if(remaining_len > 0) {
+                    buffer.resize(remaining_len);
+                    if(!RecvExact(buffer.data(), remaining_len)){
+                        Disconnect();
+                        return;
+                    }
+                }
+                if((header & 0xF0) == PACKET_PUBLISH){
+                    if(remaining_len>0){
+                        uint16_t topic_len = (buffer[0] << 8)  | buffer[1];
+                        if(topic_len + 2 <= remaining_len){
+                            std::string topic((char*)&buffer[2], topic_len);
+                            int offset = 2+topic_len;
+                            if((header & 0x06) > 0) offset += 2;
+                            if(m_on_msg)  m_on_msg(topic, &buffer[offset], remaining_len-offset);
+                        }
+                    }
+                }
+                else if(header == PACKET_PINGRESP){
+                    std::cout << "[MQTT] Subscribed OK.\n";
+                }
+                else if(header == 0xD0){
+                    std::cout << "[MQTT] Heartbeat received \n";
+                }
+            }
+        }
+
         auto now = std::chrono::steady_clock::now();
         // Send a Ping if nothing's been sent for 15s
         if(std::chrono::duration_cast<std::chrono::seconds>(now - last_sent_time).count() >= 15){
