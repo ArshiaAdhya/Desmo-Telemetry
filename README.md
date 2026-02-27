@@ -90,7 +90,7 @@ g++ -o fleet_sim src/main.cpp src/vehicle.cpp src/mqtt_forge.cpp -I include -lpt
 ./fleet_sim 102
 ```
 ## Protocol Specification
-The system uses a custom 32-Byte Little-Endian packet structure.
+The system uses a custom 32-Byte Big-Endian packet structure.
 
 |Offset|Field|Type|Description|
 |---|---|---|---|
